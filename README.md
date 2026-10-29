@@ -9,7 +9,7 @@ Guardener is in Early Access and only works with GitHub. Commands and behavior b
 | File | Upstream image | Expected result |
 |---|---|---|
 | `Dockerfile` | `python:3.12` | Migrated. No `RUN`, exec-form `ENTRYPOINT`, no `CMD`, so it is a clean swap. |
-| `docker-compose.yml` | `redis:7`, `postgres:16` | `redis:7` migrated. `postgres:16` listed as **Not migrated** because you leave it out of your catalog on purpose. |
+| `docker-compose.yml` | `redis:7`, plus an image you choose on line 11 (`rabbitmq:3` placeholder) | `redis:7` migrated. Your line 11 image listed as **Not migrated** because it is not in your catalog. |
 | `k8s/web.yaml` | `nginx:1.27` | Migrated. |
 | `k8s/cache.yaml` | `redis:7` | Migrated. |
 | `helm/demo-chart/values.yaml` | `nginx` + `1.27` | **Not migrated**. The image is split across Helm `repository` and `tag` keys, which Guardener does not rewrite. Templates are not read at all. |
@@ -52,14 +52,14 @@ Follow [Getting started with Guardener](https://edu.chainguard.dev/chainguard/gu
 
 Guardener never adds images to your organization. A reference is only swapped when the replacement image **and the matching tag** are already in your catalog.
 
-1.  Add `python`, `nginx`, `redis` and `memcached` to your registry (either through your YAML in chainguard-images/images-private or through the Console if you have access to the full catalog).
-2. **Do not add `postgres`.** That is what produces the "Not migrated" line in the demo.
-3. Tags take a few minutes to sync. Then check every image resolves as `entitled`:
+1. In the Console,  go to **Chainguard catalog** > **Add to org** (needs the `owner` role). Add `python`, `nginx`, `redis` and `memcached`. 
+2. **Pick an image that is not in your catalog** for the "Not migrated" line in the demo. Most organizations already have common images like `postgres`, so choose one you have not added. In the GitHub web UI, open `docker-compose.yml` on your copy, select the pencil (**Edit this file**), replace `rabbitmq:3` on line 11 with your image and tag, and commit directly to `main`. Keep `rabbitmq:3` if it is not in your catalog. Do not add your chosen image to the catalog.
+3. Tags take a few minutes to sync. Then check every image resolves as `entitled`, replacing `<your-line-11-image>` with the image you put on line 11:
    ```bash
    chainctl images discover --parent <chainguard-org-name> \
-     --image python:3.12 --image nginx:1.27 --image redis:7 --image memcached:1.6 --image postgres:16
+     --image python:3.12 --image nginx:1.27 --image redis:7 --image memcached:1.6 --image <your-line-11-image>
    ```
-   `postgres:16` should show `available to add`, not `entitled`. If any other image shows `no maintained tag for <tag>`, that tag has aged out. Change the tag in this repo to a maintained one, or Guardener will leave it alone.
+   Your line 11 image should show `available to add`, not `entitled`. If it shows `entitled`, it is already in your catalog and Guardener will migrate it, so pick a different image. If any other image shows `no maintained tag for <tag>`, that tag has aged out. Change the tag in this repo to a maintained one, or Guardener will leave it alone.
 
 ### 4. Confirm Guardener has scanned your copy
 
@@ -100,7 +100,7 @@ chainctl guardener github migrate create <github-org>/<repo>
 Walk through the PR:
 
 - **Changed files:** `Dockerfile`, `docker-compose.yml` (only `redis`), `k8s/web.yaml`, `k8s/cache.yaml`. Each upstream image became a `cgr.dev/chainguard/...` image with the same tag.
-- **Not migrated section:** `postgres:16` because it is not in your catalog, and `helm/demo-chart/values.yaml` because the image is split across Helm keys. Guardener explains each one. This is the honest part of the demo: it is conservative, and it tells you why.
+- **Not migrated section:** your line 11 image in `docker-compose.yml` because it is not in your catalog, and `helm/demo-chart/values.yaml` because the image is split across Helm keys. Guardener explains each one. This is the honest part of the demo: it is conservative, and it tells you why.
 - **It swaps references, nothing else.** Guardener does not build or run anything. CI should run before merge, same as any PR.
 - Do not push to the `guardener/images/` branch yourself unless you first add the `skip:guardener/images` label or assign someone. Guardener force-pushes that branch.
 
@@ -142,7 +142,7 @@ Return to the Insights dashboard and show the repo's inventory moving toward Cha
 ## Talking points to expect
 
 - **Clean swap:** `python:3.12` becomes the Chainguard Python image because the Dockerfile has no `RUN`, uses exec-form `ENTRYPOINT`, and sets no `CMD`. Guardener skips stages that break those rules, because Chainguard images are minimal and set their own entrypoint.
-- **Not migrated is a feature:** `postgres:16` shows what happens before an image is entitled. The Helm chart shows Guardener refusing to guess when an image is assembled from several keys.
+- **Not migrated is a feature:** the image you chose for line 11 of `docker-compose.yml` shows what happens before an image is entitled. The Helm chart shows Guardener refusing to guess when an image is assembled from several keys.
 - **Guardener does not run your build:** it swaps references and opens a PR. Review and CI are still yours.
 - **Nothing to install in your clusters:** it is a GitHub App plus a YAML file. Every capability is off until you opt in.
 - **Org-wide rollout:** the same `.chainguard/images.yaml` committed to the org's `.github` repo applies to every repo that lacks its own.
@@ -153,7 +153,7 @@ Fastest: delete your copy and create a new one from the template. Otherwise, clo
 
 ## Check before you present
 
-- Run the `chainctl images discover --image ...` check from prep step 3 again. Tags age out, and a missing tag turns a clean swap into "Not migrated".
+- Run the `chainctl images discover --image ...` check from prep step 3 again. Tags age out, and a missing tag turns a clean swap into "Not migrated". Also confirm your line 11 image still shows `available to add`, in case someone added it to the catalog since you set up.
 - `chainctl guardener github status` still shows your GitHub organization linked.
 - `chainctl guardener scans list` shows a recent scan of your copy.
 - Check whether the Insights dashboard is visible in your Console, so you know which version of step 1 you are giving.

@@ -5,9 +5,7 @@ services:
       - "8080:8080"
   cache:
     image: redis:7
-  db:
-    # Leave this image OUT of your Chainguard catalog on purpose.
+  extra:
+    # Replace the image on line 11 with one that is NOT in your Chainguard catalog.
     # Guardener lists it as "Not migrated", which is a good thing to show.
-    image: postgres:16
-    environment:
-      POSTGRES_PASSWORD: example
+    image: rabbitmq:3
